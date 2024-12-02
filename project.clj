@@ -1,4 +1,4 @@
-(defproject io.github.fierycod/tools.logging "1.1.2"
+(defproject io.blockether/tools.logging "1.1.2"
   :description "Clojure logging API."
   :url "https://github.com/clojure/tools.logging"
   :license {:name "Eclipse Public License"
