@@ -22,7 +22,44 @@
   (:use
    [clojure.string :only [trim-newline]]
    [clojure.pprint :only [code-dispatch pprint with-pprint-dispatch]])
-  (:require [clojure.tools.logging.impl :as impl]))
+  (:require
+   [clojure.tools.logging.util :refer [maybe-deref]]
+   [clojure.tools.logging.impl :as impl]))
+
+(defn- dynamic-resolve-via-string
+  [s]
+  (let [fq-sym (symbol s)
+        ns-str (or (namespace fq-sym)
+                   (throw (RuntimeException.
+                            (format "The value of the clojure.tools.logging.factory system property is not fully-qualified: %s"
+                                    (pr-str s)))))
+        ns-sym (symbol ns-str)
+        _      (try
+                 (require ns-sym)
+                 (catch Exception _ex
+                   (throw (RuntimeException.
+                            (format "Could not resolve namespace for %s. Either it does not exist or it has a (circular) dependency on clojure.tools.logging."
+                                    (pr-str s))))))
+        fn-sym (symbol (name fq-sym))
+        fn-var (ns-resolve ns-sym fn-sym)]
+    (if fn-var
+      @fn-var
+      (throw (RuntimeException.
+               (format "Could not resolve var for %s."
+                       (pr-str s)))))))
+
+(defmacro at-compile-time-factory-resolve
+  []
+  (let [property (System/getProperty "clojure.tools.logging.factory")]
+    ;; Require during the compilation time to avoid runtime GraalVM exceptions
+    ;; Property should be the same both at compile and runtime
+    (if (nil? property)
+      `(def custom-logging-factory (delay nil))
+      (do
+        (dynamic-resolve-via-string property)
+        `(def custom-logging-factory (delay (dynamic-resolve-via-string ~property)))))))
+
+(at-compile-time-factory-resolve)
 
 (def ^{:doc
   "The default agent used for performing logging when direct logging is
@@ -73,7 +110,7 @@
   ([level throwable message]
     `(log ~*ns* ~level ~throwable ~message))
   ([logger-ns level throwable message]
-    `(log *logger-factory* ~logger-ns ~level ~throwable ~message))
+    `(log (maybe-deref *logger-factory*) ~logger-ns ~level ~throwable ~message))
   ([logger-factory logger-ns level throwable message]
     `(let [logger# (impl/get-logger ~logger-factory ~logger-ns)]
        (if (impl/enabled? logger# ~level)
@@ -87,7 +124,7 @@
   [level x & more]
   (if (or (instance? String x) (nil? more)) ; optimize for common case
     `(log ~level (print-str ~x ~@more))
-    `(let [logger# (impl/get-logger *logger-factory* ~*ns*)]
+    `(let [logger# (impl/get-logger (maybe-deref *logger-factory*) ~*ns*)]
        (if (impl/enabled? logger# ~level)
          (let [x# ~x]
            (if (instance? Throwable x#) ; type check only when enabled
@@ -102,7 +139,7 @@
   [level x & more]
   (if (or (instance? String x) (nil? more)) ; optimize for common case
     `(log ~level (format ~x ~@more))
-    `(let [logger# (impl/get-logger *logger-factory* ~*ns*)]
+    `(let [logger# (impl/get-logger (maybe-deref *logger-factory*) ~*ns*)]
        (if (impl/enabled? logger# ~level)
          (let [x# ~x]
            (if (instance? Throwable x#) ; type check only when enabled
@@ -116,7 +153,7 @@
   ([level]
     `(enabled? ~level ~*ns*))
   ([level logger-ns]
-    `(impl/enabled? (impl/get-logger *logger-factory* ~logger-ns) ~level)))
+    `(impl/enabled? (impl/get-logger (maybe-deref *logger-factory*) ~logger-ns) ~level)))
 
 (defmacro spy
   "Evaluates expr and may write the form and its result to the log. Returns the
@@ -148,7 +185,7 @@
 (defn log-stream
   "Creates a PrintStream that will output to the log at the specified level."
   [level logger-ns]
-  (let [logger (impl/get-logger *logger-factory* logger-ns)]
+  (let [logger (impl/get-logger (maybe-deref *logger-factory*) logger-ns)]
     (java.io.PrintStream.
       (proxy [java.io.ByteArrayOutputStream] []
         (flush []
@@ -297,31 +334,10 @@
   [& args]
   `(logf :fatal ~@args))
 
-(defn- call-str [str]
-  (let [fq-sym (symbol str)
-        ns-str (or (namespace fq-sym)
-                   (throw (RuntimeException.
-                            (format "The value of the clojure.tools.logging.factory system property is not fully-qualified: %s"
-                                    (pr-str str)))))
-        ns-sym (symbol ns-str)
-        _      (try
-                 (require ns-sym)
-                 (catch Exception ex
-                   (throw (RuntimeException.
-                            (format "Could not resolve namespace for %s. Either it does not exist or it has a (circular) dependency on clojure.tools.logging."
-                                    (pr-str str))))))
-        fn-sym (symbol (name fq-sym))
-        fn-var (ns-resolve ns-sym fn-sym)]
-    (if fn-var
-      (fn-var)
-      (throw (RuntimeException.
-               (format "Could not resolve var for %s."
-                       (pr-str str)))))))
-
 (defn- find-factory []
-  (if-let [factory-fn-str (System/getProperty "clojure.tools.logging.factory")]
-    (call-str factory-fn-str)
-    (impl/find-factory)))
+  #_{:clj-kondo/ignore [:unresolved-symbol]}
+  (let [resolved-factory @custom-logging-factory]
+    (or (and resolved-factory (resolved-factory)) (impl/find-factory))))
 
 (def ^:dynamic *logger-factory*
   "An instance satisfying the clojure.tools.logging.impl/LoggerFactory protocol,
@@ -335,4 +351,4 @@
   LoggerFactory implementation via binding or alter-var-root.
 
   See the various factory functions in clojure.tools.logger.impl."
-  (find-factory))
+  (delay (find-factory)))

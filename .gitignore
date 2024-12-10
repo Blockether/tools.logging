@@ -5,3 +5,9 @@
 .settings
 bin
 target
+.clj-kondo
+.cpcache
+.lsp
+.portal
+.calva
+pom.xml.asc

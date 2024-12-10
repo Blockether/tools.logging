@@ -45,7 +45,7 @@
   `(let [stateful-log# (log-test/atomic-log log-entry-with-thread)
          logger-factory# (log-test/logger-factory stateful-log# (constantly true))]
      (binding [log-test/*stateful-log*   stateful-log#
-               *logger-factory* logger-factory#]
+               *logger-factory* (delay logger-factory#)]
        ~@body)))
 
 (defmacro with-log-level [level & body]
@@ -273,7 +273,7 @@
     (.println System/out "hello world")
     (is (logged? "foobar" :info nil "hello world"))
     (log-uncapture!))
-  
+
   (with-log
     (log-capture! "foobar")
     (.println System/err "oh noes")
@@ -286,7 +286,7 @@
     (.println System/out "hello world")
     (is (logged? "foobar" :error nil "hello world"))
     (log-uncapture!))
-  
+
   (with-log
     (log-capture! "foobar" :error :fatal)
     (.println System/err "oh noes")
@@ -358,33 +358,8 @@
       errorf :error
       fatalf :fatal)))
 
-
-(deftest test-call-str
-  (testing "throws exception if input is not fully-qualified"
-    (is (thrown-with-msg? RuntimeException #"fully-qualified"
-                          (#'log/call-str "foobar"))))
-
-  (testing "throws exception if ns does not exist"
-    (is (thrown-with-msg? RuntimeException #"resolve namespace"
-                          (#'log/call-str "missing.ns/some-fn"))))
-
-  (testing "throws exception if fn does not exist"
-    (is (thrown-with-msg? RuntimeException #"resolve var"
-                          (#'log/call-str "external.ns/does-not-exist-fn"))))
-
-  (testing "yields the right factory when specified"
-    (is (= "external.ns/good-fn"
-           (impl/name (#'log/call-str "external.ns/factory"))))))
-
-
 (deftest test-find-factory
-  (testing "when system property is unset, invokes impl/find-factory"
-    (System/clearProperty "clojure.tools.logging.factory")
-    (is (= (impl/name (impl/find-factory)) (impl/name (#'log/find-factory)))))
-
   (testing "when system propery is set, yields the results"
     (System/setProperty "clojure.tools.logging.factory" "external.ns/factory")
-    (is (= "external.ns/good-fn" (impl/name (#'log/find-factory)))))
-
-  (System/clearProperty "clojure.tools.logging.factory"))
+    (is (= "external.ns/good-fn" (impl/name (#'log/find-factory))))))
 

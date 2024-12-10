@@ -69,33 +69,33 @@
          "org.apache.logging.log4j.Logger"
          "org.apache.log4j.Logger"
          "java.util.logging.Logger"))
-  
+
   (testing "finds slf4j"
     (with-blacklist-loader []
       (is (= "org.slf4j" (impl/name (impl/find-factory))))))
-  
+
   (testing "finds cl"
     (with-blacklist-loader ["org.slf4j.Logger"]
       (is (= "org.apache.commons.logging" (impl/name (impl/find-factory))))))
-  
+
   (testing "finds log4j2"
     (with-blacklist-loader ["org.slf4j.Logger"
                             "org.apache.commons.logging.Log"]
       (is (= "org.apache.logging.log4j" (impl/name (impl/find-factory))))))
-  
+
   (testing "finds log4j"
     (with-blacklist-loader ["org.slf4j.Logger"
                             "org.apache.commons.logging.Log"
                             "org.apache.logging.log4j.Logger"]
       (is (= "org.apache.log4j" (impl/name (impl/find-factory))))))
-  
+
   (testing "finds jul"
     (with-blacklist-loader ["org.slf4j.Logger"
                             "org.apache.commons.logging.Log"
                             "org.apache.logging.log4j.Logger"
                             "org.apache.log4j.Logger"]
       (is (= "java.util.logging" (impl/name (impl/find-factory))))))
-  
+
   (testing "finds none"
     (with-blacklist-loader ["org.slf4j.Logger"
                             "org.apache.commons.logging.Log"
