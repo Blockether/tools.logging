@@ -1,4 +1,4 @@
-(defproject io.blockether/tools.logging "1.3.4"
+(defproject io.blockether/tools.logging "1.3.5"
   :description "Clojure logging API - blockether.io modification for reflection free resolve of custom logger - GraalVM compatible"
   :url "https://github.com/io.blockether/tools.logging"
   :license {:name "Eclipse Public License"

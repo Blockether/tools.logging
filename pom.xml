@@ -4,7 +4,7 @@
   <groupId>io.blockether</groupId>
   <artifactId>tools.logging</artifactId>
   <packaging>jar</packaging>
-  <version>1.3.4</version>
+  <version>1.3.5</version>
   <name>tools.logging</name>
   <description>Clojure logging API - blockether.io modification for reflection free resolve of custom logger - GraalVM compatible</description>
   <url>https://github.com/io.blockether/tools.logging</url>
@@ -18,7 +18,7 @@
     <url>https://github.com/Blockether/tools.logging</url>
     <connection>scm:git:git://github.com/Blockether/tools.logging.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/Blockether/tools.logging.git</developerConnection>
-    <tag>f1e5f0404cedb460a46edcb1bddb514ea6f8dc91</tag>
+    <tag>e82c87013ce93b580cf4b918d26cc357755d4733</tag>
   </scm>
   <build>
     <sourceDirectory>src/main/clojure</sourceDirectory>

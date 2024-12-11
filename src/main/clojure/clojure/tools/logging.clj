@@ -54,10 +54,11 @@
     ;; Require during the compilation time to avoid runtime GraalVM exceptions
     ;; Property should be the same both at compile and runtime
     (if (nil? property)
-      `(def custom-logging-factory (delay nil))
+      `(def custom-logging-factory nil)
       (do
         (dynamic-resolve-via-string property)
-        `(def custom-logging-factory (delay (dynamic-resolve-via-string ~property)))))))
+        `(def custom-logging-factory
+           (dynamic-resolve-via-string (System/getProperty "clojure.tools.logging.factory")))))))
 
 (at-compile-time-factory-resolve)
 
@@ -336,8 +337,8 @@
 
 (defn- find-factory []
   #_{:clj-kondo/ignore [:unresolved-symbol]}
-  (let [resolved-factory @custom-logging-factory]
-    (or (and resolved-factory (resolved-factory)) (impl/find-factory))))
+  (or (and custom-logging-factory (custom-logging-factory))
+      (impl/find-factory)))
 
 (def ^:dynamic *logger-factory*
   "An instance satisfying the clojure.tools.logging.impl/LoggerFactory protocol,
