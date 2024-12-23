@@ -26,28 +26,35 @@
    [clojure.tools.logging.util :refer [maybe-deref]]
    [clojure.tools.logging.impl :as impl]))
 
-(defn- dynamic-resolve-via-string
+(defn- string->symbol-safe
   [s]
-  (let [fq-sym (symbol s)
-        ns-str (or (namespace fq-sym)
-                   (throw (RuntimeException.
-                            (format "The value of the clojure.tools.logging.factory system property is not fully-qualified: %s"
-                                    (pr-str s)))))
-        ns-sym (symbol ns-str)
-        _      (try
-                 (require ns-sym)
-                 (catch Exception _ex
-                   (throw (RuntimeException.
-                            (format "Could not resolve namespace for %s. Either it does not exist or it has a (circular) dependency on clojure.tools.logging."
-                                    (pr-str s))))))
-        fn-sym (symbol (name fq-sym))
-        fn-var (ns-resolve ns-sym fn-sym)]
-    (if fn-var
-      @fn-var
-      (throw (RuntimeException.
-               (format "Could not resolve var for %s."
-                       (pr-str s)))))))
+  (try 
+    (symbol s)
+  (catch Exception _ex
+    nil)))
 
+(defn- dynamic-resolve-factory
+  [s]
+  (when-let [fq-sym (string->symbol-safe (str s))]
+	  (let [ns-str (or (namespace fq-sym)
+	                   (throw (RuntimeException.
+	                            (format "The value of the clojure.tools.logging.factory system property is not fully-qualified: %s"
+	                                    (pr-str s)))))
+	        ns-sym (symbol ns-str)
+	        _      (try
+	                 (require ns-sym)
+	                 (catch Exception _ex
+	                   (throw (RuntimeException.
+	                            (format "Could not resolve namespace for %s. Either it does not exist or it has a (circular) dependency on clojure.tools.logging."
+	                                    (pr-str s))))))
+	        fn-sym (symbol (name fq-sym))
+	        fn-var (ns-resolve ns-sym fn-sym)]
+	    (if fn-var
+	      @fn-var
+	      (throw (RuntimeException.
+	               (format "Could not resolve var for %s."
+	                       (pr-str s))))))))
+	
 (defmacro at-compile-time-factory-resolve
   []
   (let [property (System/getProperty "clojure.tools.logging.factory")]
@@ -56,9 +63,9 @@
     (if (nil? property)
       `(def custom-logging-factory nil)
       (do
-        (dynamic-resolve-via-string property)
+        (dynamic-resolve-factory property)
         `(def custom-logging-factory
-           (dynamic-resolve-via-string (System/getProperty "clojure.tools.logging.factory")))))))
+           (dynamic-resolve-factory (System/getProperty "clojure.tools.logging.factory")))))))
 
 (at-compile-time-factory-resolve)
 
